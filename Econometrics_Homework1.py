@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Sep 14 23:53:19 2019
-
 @author: Daniil
 """
 
@@ -79,25 +78,25 @@ for length_num, length in enumerate(var_lengths):
         y = b1 * const + b2 * x + eps
 
         # Расчёт OLS-оценки
-        betas = dot(inv(dot(transpose(X), X)), dot(transpose(X), y))
-        betas_matrix = vstack((betas_matrix, transpose(betas)))
+        betas = dot(inv(dot(X.T, X)), dot(X.T, y))
+        betas_matrix = vstack((betas_matrix, betas.T))
         
         # Оценка зависимой переменной
         y_hat = dot(X, betas)
         y_mean = full((var_lengths[length_num], 1), mean(y))
         
         # Оценка дисперсии ошибок
-        var_eps.append(dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num]))
-        var_eps_corrected.append(dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num] - 2))
-        true_var_eps.append(dot(transpose(eps), (eps)) / (var_lengths[length_num]))
+        var_eps.append(dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num]))
+        var_eps_corrected.append(dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num] - 2))
+        true_var_eps.append(dot(eps.T, (eps)) / (var_lengths[length_num]))
 
         # Covariance matrix under homoskedasticity: V_b = (XTX)^-1*sigma^2_e
         # Оценка истинной дисперсии
-        true_var_betas = inv(dot(transpose(X), X)) * dot(transpose(eps), (eps)) / (var_lengths[length_num] - 2)
+        true_var_betas = inv(dot(X.T, X)) * dot(eps.T, (eps)) / (var_lengths[length_num] - 2)
         true_var_b1.append(true_var_betas[0, 0])
         true_var_b2.append(true_var_betas[1, 1])
         # Оценка дисперсии
-        var_betas = inv(dot(transpose(X), X)) * dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num] - 2)
+        var_betas = inv(dot(X.T, X)) * dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num] - 2)
         var_b1.append(var_betas[0, 0])
         var_b2.append(var_betas[1, 1])
 
@@ -176,24 +175,24 @@ for length_num, length in enumerate(var_lengths):
         y = b1 * const + b2 * x + eps
         
         # Расчёт OLS-оценки
-        betas = dot(inv(dot(transpose(X), X)), dot(transpose(X), y))
-        betas_matrix = vstack((betas_matrix, transpose(betas)))
+        betas = dot(inv(dot(X.T, X)), dot(X.T, y))
+        betas_matrix = vstack((betas_matrix, betas.T))
 
         # Оценка зависимой переменной
         y_hat = dot(X, betas)
         y_mean = full((var_lengths[length_num], 1), mean(y))
 
         # Оценка дисперсии ошибок
-        var_eps.append(dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num]))
-        var_eps_corrected.append(dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num] - 2))
-        true_var_eps.append(dot(transpose(eps), (eps)) / (var_lengths[length_num]))
+        var_eps.append(dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num]))
+        var_eps_corrected.append(dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num] - 2))
+        true_var_eps.append(dot(eps.T, (eps)) / (var_lengths[length_num]))
 
         # Оценка истинной дисперсии
-        true_var_betas = inv(dot(transpose(X), X)) * dot(transpose(eps), (eps)) / (var_lengths[length_num] - 2)
+        true_var_betas = inv(dot(X.T, X)) * dot(eps.T, (eps)) / (var_lengths[length_num] - 2)
         true_var_b1.append(true_var_betas[0, 0])
         true_var_b2.append(true_var_betas[1, 1])
 
-        var_betas = inv(dot(transpose(X), X)) * dot(transpose(y_hat - y), (y_hat - y)) / (var_lengths[length_num] - 2)
+        var_betas = inv(dot(X.T, X)) * dot((y_hat - y).T, (y_hat - y)) / (var_lengths[length_num] - 2)
         var_b1.append(var_betas[0, 0])
         var_b2.append(var_betas[1, 1])
         t_stat = (betas[1, 0] - 0.5) / (var_b2[iter] ** 0.5)
@@ -241,7 +240,6 @@ file.write('\n\nПроведём расчёты, необходимые для �
 это предположение. В среднем смешанный момент оказался на уровне -0.00304
 Предположение 2.4: матрица E(xxt) не должна быть вырожденной (не подтверждается).
 Предположение 2.5: матрица перекрестных моментов E(ggt) вырождена.
-
 Оценка дисперсий остатков и ошибок показала, что, как очевидно по формуле, дисперсия1
 всегда меньше дисперсии2. Примечательно, что в соответствии с теорией, оценка дисперсии2
 более близка к истинной и во всех результатах оказалась существенно точнее.
@@ -276,7 +274,6 @@ for c, value in enumerate(var_lengths):
         # Генерация x
         x = r*x0 + d + dot(A, ita)
         const = ones((var_lengths[c], 1))
-
         # Матрица значений X
         X = hstack((const, x))
         
@@ -287,18 +284,16 @@ for c, value in enumerate(var_lengths):
         y = b1 * const + b2 * x + eps
         
         # Расчёт OLS-оценки
-        betas = dot(inv(dot(transpose(X), X)), dot(transpose(X), y))
-        betas_matrix = vstack((betas_matrix, transpose(betas)))
-
+        betas = dot(inv(dot(X.T, X)), dot(X.T, y))
+        betas_matrix = vstack((betas_matrix, betas.T))
         y_hat = dot(X, betas)
         y_mean = array([[mean(y)] for _ in range(var_lengths[c])])
-
         tss = (y - y_mean) ** 2
         rss = (y_hat - y_mean) ** 2
         ess = (eps ** 2) / (var_lengths[c] - 2)
         
-        sigma2 = dot(transpose(eps), eps) / (var_lengths[c] - 2)
-        var_betas = inv(dot(transpose(X), X)) * sigma2
+        sigma2 = dot(eps.T, eps) / (var_lengths[c] - 2)
+        var_betas = inv(dot(X.T, X)) * sigma2
         t_stat = (betas[1][0] - 0.5) / (var_betas[1][1] ** 0.5)
         # Проверяем переменные на нормальность
         corr_x_y = hstack((x, y))
@@ -309,11 +304,10 @@ for c, value in enumerate(var_lengths):
             t_cor_ar.append(cor_ar[iter] * (math.sqrt(198)) / math.sqrt(1 - cor_ar[iter]))
             x_e = x * eps               # Поиск смешанного момента
             e_x_e.append(mean(x_e))  # Поиск смешанного момента
-            xxt = X.dot(transpose(X))# Расчёт матрицы XX'
+            xxt = X.dot(X.T)# Расчёт матрицы XX'
             det_xxt.append(det(xxt))
-            ggt = x_e.dot(transpose(x_e))    # Поиск определителя ggt
+            ggt = x_e.dot(x_e.T)    # Поиск определителя ggt
             det_ggt.append(det(ggt))
-
 jb_x = array(jb_x)
 jb_y = array(jb_y)
 jb_x = mean(jb_x)
@@ -330,7 +324,6 @@ file.write('Значимость корреляции: ' + str(t_cor))
 file.write('Среднее значением смешанного момента по всем построенным моделям: ' + str(mean(e_x_e)))
 det_xxt = array(det_xxt)
 file.write('Средний определитель матрицы xxt: ' + str(mean(det_xxt)))
-
 # ---------------------------------------------------------------------------
 '''
 file.write('\n\n\nЗадание 4. Генерация моделей с коррекцией ошибок на некоторую сигму для создания гетероскедастичности.')
@@ -344,7 +337,7 @@ file.write('Рассчитаем t-статистики с использова�
 def XDX_matrix(X, eps):
     # Для HC0 и HC1
     xe2 = 0
-    eps = diagonal(dot(eps, transpose(eps)))
+    eps = diagonal(dot(eps, eps.T))
     for row in range(len(X)):
         xe2 += dot(X[row].reshape(2, 1), X[row].reshape(1, 2)) * eps[row]
     return xe2
@@ -353,8 +346,8 @@ def XDX_matrix(X, eps):
 def XDX_matrix_2(X, eps):
     # Для HC2
     # Оценка (1-h)eps
-    h = diagonal(dot(dot(X, inv(dot(transpose(X), X))), transpose(X)))
-    eps = diagonal(dot(eps, transpose(eps)))
+    h = diagonal(dot(dot(X, inv(dot(X.T, X))), X.T))
+    eps = diagonal(dot(eps, eps.T))
     xe2 = 0
     for row in range(len(X)):
         xe2 += dot((1 - h[row]) ** -1 * X[row].reshape(2, 1), X[row].reshape(1, 2)) * eps[row]
@@ -364,8 +357,8 @@ def XDX_matrix_2(X, eps):
 def XDX_matrix_3(X, eps):
     # Для HC3
     # Оценка (1-h)eps
-    h = diagonal(dot(dot(X, inv(dot(transpose(X), X))), transpose(X)))
-    eps = diagonal(dot(eps, transpose(eps)))
+    h = diagonal(dot(dot(X, inv(dot(X.T, X))), X.T))
+    eps = diagonal(dot(eps, eps.T))
     xe2 = 0
     for row in range(len(X)):
         xe2 += dot((1 - h[row]) ** -2 * X[row].reshape(2, 1), X[row].reshape(1, 2)) * eps[row]
@@ -405,20 +398,20 @@ for length_num, length in enumerate(var_lengths):
         # Объединение иксов в матрицу
         X = hstack((x1, x2))
         # Оценка бет
-        betas = dot(inv(dot(transpose(X), X)), dot(transpose(X), y))
+        betas = dot(inv(dot(X.T, X)), dot(X.T, y))
         # Присоединение оценок к массиву
-        betas_matrix = vstack((betas_matrix, betas.transpose()))
+        betas_matrix = vstack((betas_matrix, betas.T))
         # Оценка зависимой переменной
-        y_hat = X.dot(betas)
+        y_hat = dot(X, betas)
         # Вектор средних значений зависимой переменной
         y_mean = full((var_lengths[length_num], 1), mean(y))
         
         # ------------------Оценка дисперсий остатков и ошибок----------------------------------
         # Covariance matrix under homoskedasticity: V_b = (XTX)^-1*sigma^2_e
-        var_betas = inv(dot(transpose(X), X)) * (dot(transpose(y - y_hat), (y - y_hat)) / var_lengths[length_num])
+        var_betas = inv(dot(X.T, X)) * (dot((y - y_hat).T, (y - y_hat)) / var_lengths[length_num])
         var_b1.append(var_betas[0, 0])
         var_b2.append(var_betas[1, 1])
-        var_betas_corrected = inv(dot(transpose(X), X)) * dot(transpose(y - y_hat), (y - y_hat)) / (var_lengths[length_num] - 2)
+        var_betas_corrected = inv(dot(X.T, X)) * dot((y - y_hat).T, (y - y_hat)) / (var_lengths[length_num] - 2)
         var_b1_corrected.append(var_betas_corrected[0, 0])
         var_b2_corrected.append(var_betas_corrected[1, 1])
         # HC-оценки дисперсий
@@ -426,25 +419,25 @@ for length_num, length in enumerate(var_lengths):
         # General form of the Cov matrix: (XTX)^-1*(XT*D*X)*(XTX)^-1, where
         # D = diag(s1^1, ..., sn^2) = E(e*eT|X) = E(D_|X), D_ - an unbiased estimator for D
         # eps~ = M* * eps^ where M* - diagonal matrix with i-th elements (1 - htt)^-1, M = I - X(XTX)^-1XT
-        HC0 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC0 = dot(dot(inv(dot(X.T, X)), XDX_matrix(X, y - y_hat)), inv(dot(X.T, X)))
         HC0_b1.append(HC0[0, 0])
         HC0_b2.append(HC0[1, 1])
-        HC1 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix(X, y - y_hat)), inv(dot(transpose(X), X))) * (var_lengths[length_num] / (var_lengths[length_num] - 2))
+        HC1 = dot(dot(inv(dot(X.T, X)), XDX_matrix(X, y - y_hat)), inv(dot(X.T, X))) * (var_lengths[length_num] / (var_lengths[length_num] - 2))
         HC1_b1.append(HC1[0, 0])
         HC1_b2.append(HC1[1, 1])
-        HC2 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix_2(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC2 = dot(dot(inv(dot(X.T, X)), XDX_matrix_2(X, y - y_hat)), inv(dot(X.T, X)))
         HC2_b1.append(HC2[0, 0])
         HC2_b2.append(HC2[1, 1])
-        HC3 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix_3(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC3 = dot(dot(inv(dot(X.T, X)), XDX_matrix_3(X, y - y_hat)), inv(dot(X.T, X)))
         HC3_b1.append(HC3[0, 0])
         HC3_b2.append(HC3[1, 1])
         # Дисперсия на исходных данных
-        true_var_betas = inv(dot(transpose(X), X)) * (dot(transpose(eps_cor), eps_cor) / var_lengths[length_num])
+        true_var_betas = inv(dot(X.T, X)) * (dot(eps_cor.T, eps_cor) / var_lengths[length_num])
         true_var_b1.append(true_var_betas[0, 0])
         true_var_b2.append(true_var_betas[1, 1])
 
         # Оценка степени гетероскедастичности
-        eet = dot((y - y_hat), transpose(y - y_hat))
+        eet = dot((y - y_hat), (y - y_hat).T)
         eet = diagonal(eet)
         eet_max = max(eet)
         eet_min = min(eet)
@@ -601,17 +594,17 @@ for case in range(3):
         y = b1 * x1 + b2 * x2 + eps
         X = hstack((x1, x2))
         # Оценка коэффициентов
-        betas = dot(inv(dot(transpose(X), X)), dot(transpose(X), y))
-        betas_matrix = vstack((betas_matrix, transpose(betas)))
+        betas = dot(inv(dot(X.T, X)), dot(X.T, y))
+        betas_matrix = vstack((betas_matrix, betas.T))
         y_hat = dot(X, betas)
         y_mean = full((n, 1), mean(y))
         
         # ------------------Оценка дисперсий остатков и ошибок----------------------------------
         # Covariance matrix under homoskedasticity: V_b = (XTX)^-1*sigma^2_e
-        var_betas = inv(dot(transpose(X), X)) * (dot(transpose(y - y_hat), (y - y_hat)) / 200)
+        var_betas = inv(dot(X.T, X)) * (dot((y - y_hat).T, (y - y_hat)) / 200)
         var_b1.append(var_betas[0, 0])
         var_b2.append(var_betas[1, 1])
-        var_betas_corrected = inv(dot(transpose(X), X)) * dot(transpose(y - y_hat), (y - y_hat)) / 198
+        var_betas_corrected = inv(dot(X.T, X)) * dot((y - y_hat).T, (y - y_hat)) / 198
         var_b1_corrected.append(var_betas_corrected[0, 0])
         var_b2_corrected.append(var_betas_corrected[1, 1])
         # HC-оценки дисперсий
@@ -619,24 +612,24 @@ for case in range(3):
         # General form of the Cov matrix: (XTX)^-1*(XT*D*X)*(XTX)^-1, where
         # D = diag(s1^1, ..., sn^2) = E(e*eT|X) = E(D_|X), D_ - an unbiased estimator for D
         # eps~ = M* * eps^ where M* - diagonal matrix with i-th elements (1 - htt)^-1, M = I - X(XTX)^-1XT
-        HC0 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC0 = dot(dot(inv(dot(X.T, X)), XDX_matrix(X, y - y_hat)), inv(dot(X.T, X)))
         HC0_b1.append(HC0[0, 0])
         HC0_b2.append(HC0[1, 1])
-        HC1 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix(X, y - y_hat)), inv(dot(transpose(X), X))) * (200 / 198)
+        HC1 = dot(dot(inv(dot(X.T, X)), XDX_matrix(X, y - y_hat)), inv(dot(X.T, X))) * (200 / 198)
         HC1_b1.append(HC1[0, 0])
         HC1_b2.append(HC1[1, 1])
-        HC2 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix_2(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC2 = dot(dot(inv(dot(X.T, X)), XDX_matrix_2(X, y - y_hat)), inv(dot(X.T, X)))
         HC2_b1.append(HC2[0, 0])
         HC2_b2.append(HC2[1, 1])
-        HC3 = dot(dot(inv(dot(transpose(X), X)), XDX_matrix_3(X, y - y_hat)), inv(dot(transpose(X), X)))
+        HC3 = dot(dot(inv(dot(X.T, X)), XDX_matrix_3(X, y - y_hat)), inv(dot(X.T, X)))
         HC3_b1.append(HC3[0, 0])
         HC3_b2.append(HC3[1, 1])
         # Дисперсия на исходных данных
-        true_var_betas = inv(dot(transpose(X), X)) * (dot(transpose(eps), eps) / 200)
+        true_var_betas = inv(dot(X.T, X)) * (dot(eps.T, eps) / 200)
         true_var_b1.append(true_var_betas[0, 0])
         true_var_b2.append(true_var_betas[1, 1])
         
-        eet = dot((y - y_hat), transpose((y - y_hat)))
+        eet = dot((y - y_hat), (y - y_hat).T)
         eet = diagonal(eet)
         eet_max = max(eet)
         eet_min = min(eet)
