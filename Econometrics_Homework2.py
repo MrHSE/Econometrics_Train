@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Okt 13 12:24:32 2019
-
 @author: Daniil
 """
 from numpy import dot, array, eye, ones, zeros, hstack, vstack, mean, transpose, corrcoef, diagonal, reshape, exp, full, diagflat, abs, split, shape
 from numpy.random import normal, uniform, standard_cauchy, randint, choice
 from numpy.linalg import inv, det
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from math import sin, cos
 from prettytable import PrettyTable
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -46,6 +47,39 @@ def ar_r(T, *coefs):
     return Xt, Xt_lags
 
 
+def XDX_bartlett_matrix(X, eps, lag):
+    # Для ковариационной матрицы ошибок для расчёта HAC-оценки
+    # L - максимально дальний элемент ковариационной матрицы от диагонали
+    L = int(4 * ((len(X) / 100)) ** (2/9))
+    xe2 = 0
+    for row in range(len(X)):
+        # Часть e^2 * x * xT
+        xe2 += dot(X[row].reshape(2, 1), X[row].reshape(1, 2)) * eps[row] ** 2
+    # Часть Ковариационной матрицы для оценки внедиагональных элементов ядром Бартлетта
+    for diag in range(L):
+        for row in range(lag, len(X)):
+            x = abs(lag / (diag + 1))
+            xe2 += (1 - x) * eps[row] * eps[row - lag] * (dot(X[row].reshape(2,1), X[row - lag].reshape(1,2)) + dot(X[row - lag].reshape(2,1), X[row].reshape(1,2)))
+    return xe2
+
+
+def XDX_QS_matrix(X, eps, lag):
+    # Для ковариационной матрицы ошибок для расчёта HAC-оценки
+    # L - максимально дальний элемент ковариационной матрицы от диагонали
+    L = int(4 * ((len(X) / 100)) ** (2/9))
+    xe2 = 0
+    pi = 3.1416
+    for row in range(len(X)):
+        # Часть e^2 * x * xT
+        xe2 += dot(X[row].reshape(2, 1), X[row].reshape(1, 2)) * eps[row] ** 2
+    # Часть Ковариационной матрицы для оценки внедиагональных элементов c квадратичным спектральным ядром
+    for diag in range(L):
+        for row in range(lag, len(X)):
+            x = lag / (diag + 1)
+            xe2 += ((25/(12*pi**2*x**2)) * (sin(6*pi*x/5) / (6*pi*x/5) - cos(6*pi*x/5))) * eps[row] * eps[row - lag] * (dot(X[row].reshape(2,1), X[row - lag].reshape(1,2)) + dot(X[row - lag].reshape(2,1), X[row].reshape(1,2)))
+    return xe2
+
+
 def var_shift(var, shift):
     # Функция, чтобы получить ряд xt-1
     new_var = zeros(shape=(len(var), 1))
@@ -61,21 +95,73 @@ def table_part ():
 
     total_t_ar = []
     total_t_ma = []
+    total_t_ar_corr = []
+    total_t_ma_corr = []
     total_t = []
     B = int(input("Определите количество итераций: "))
     for coef_num, coef in enumerate(coefs_vars):
         print(str(coef_num / 4 * 100) + '% выполнено')
-        h0_rej_ma_gr2, h0_rej_ma_gr4, h0_rej_ma_gr8, h0_rej_ma_gr16 = 0, 0, 0, 0
-        h0_rejection_ma_list = [h0_rej_ma_gr2, h0_rej_ma_gr4, h0_rej_ma_gr8, h0_rej_ma_gr16]
-        h0_rej_ar_gr2, h0_rej_ar_gr4, h0_rej_ar_gr8, h0_rej_ar_gr16 = 0, 0, 0, 0
-        h0_rejection_ar_list = [h0_rej_ar_gr2, h0_rej_ar_gr4, h0_rej_ar_gr8, h0_rej_ar_gr16]
+        # Счётчики для количества отвержений t-статистики
+        h0_rej_ma_gr2, h0_rej_ma_gr4, h0_rej_ma_gr8, h0_rej_ma_gr16, h0_rej_ma_b, h0_rej_ma_qs = 0, 0, 0, 0, 0, 0
+        h0_rejection_ma_list = [h0_rej_ma_gr2, h0_rej_ma_gr4, h0_rej_ma_gr8, h0_rej_ma_gr16, h0_rej_ma_b, h0_rej_ma_qs]
+        h0_rej_ar_gr2, h0_rej_ar_gr4, h0_rej_ar_gr8, h0_rej_ar_gr16, h0_rej_ar_b, h0_rej_ar_qs = 0, 0, 0, 0, 0, 0
+        h0_rejection_ar_list = [h0_rej_ar_gr2, h0_rej_ar_gr4, h0_rej_ar_gr8, h0_rej_ar_gr16, h0_rej_ar_b, h0_rej_ar_qs]
+        # Счётчики для скорректированных статистики
+        h0_rej_ma_gr2_corr, h0_rej_ma_gr4_corr, h0_rej_ma_gr8_corr, h0_rej_ma_gr16_corr, h0_rej_ma_b_corr, h0_rej_ma_qs_corr = 0, 0, 0, 0, 0, 0
+        h0_rejection_ma_corr_list = [h0_rej_ma_gr2_corr, h0_rej_ma_gr4_corr, h0_rej_ma_gr8_corr, h0_rej_ma_gr16_corr, h0_rej_ma_b_corr, h0_rej_ma_qs_corr]
+        h0_rej_ar_gr2_corr, h0_rej_ar_gr4_corr, h0_rej_ar_gr8_corr, h0_rej_ar_gr16_corr, h0_rej_ar_b_corr, h0_rej_ar_qs_corr = 0, 0, 0, 0, 0, 0
+        h0_rejection_ar_corr_list = [h0_rej_ar_gr2_corr, h0_rej_ar_gr4_corr, h0_rej_ar_gr8_corr, h0_rej_ar_gr16_corr, h0_rej_ar_b_corr, h0_rej_ar_qs_corr]
         for _ in range(B):
+            # -----------------Оценка t-статистики c использованием оценки Нью-Веста------------------------------------
             # Генерация MA(1)-процесса по заданной функции
             b1, z = 2, 1.5
             y_ma, Xt_ma = ma_q(T, z, b1, coef)
+            # Оценка коэффициентов
+            betas_ma = dot(inv(dot(Xt_ma.T, Xt_ma)), dot(Xt_ma.T, y_ma))
+            y_ma_hat = dot(Xt_ma, betas_ma)
+            # Оценка дисперсии по формуле Ньюи-Веста с ядром Бартлетта
+            var_b_west = dot(dot(inv(dot(Xt_ma.T, Xt_ma)), XDX_bartlett_matrix(Xt_ma, y_ma - y_ma_hat, 1)), inv(dot(Xt_ma.T, Xt_ma)))
+            t_stat = (betas_ma[1, 0] - coef) / (var_b_west[1, 1] ** 0.5)
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ma_list[4] += 1
+            # Скорректировано на размер
+            t_stat = (betas_ma[1, 0] - coef) / (var_b_west[1, 1] ** 0.5) + 5 / 128 ** 0.5
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ma_corr_list[4] += 1
+            # Оценка дисперсии по формуле Ньюи-Веста с квадратичным спектральным ядром
+            var_qs_west = dot(dot(inv(dot(Xt_ma.T, Xt_ma)), XDX_QS_matrix(Xt_ma, y_ma - y_ma_hat, 1)), inv(dot(Xt_ma.T, Xt_ma)))
+            t_stat = (betas_ma[1, 0] - coef) / (var_qs_west[1, 1] ** 0.5)
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ma_list[5] += 1
+            # Скорректировано на размер
+            t_stat = (betas_ma[1, 0] - coef) / (var_qs_west[1, 1] ** 0.5) + 5 / 128 ** 0.5
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ma_corr_list[5] += 1
 
             # Генерация AR(1)-процесса по заданной функции
             Xt, xt_lags = ar_r(T, b1, coef)
+            # Оценка коэффициентов
+            betas_ar = dot(inv(dot(xt_lags.T, xt_lags)), dot(xt_lags.T, Xt))
+            Xt_hat = dot(xt_lags, betas_ar)
+            # Оценка дисперсии по формуле Ньюи-Веста с ядром Бартлетта
+            var_b_west = dot(dot(inv(dot(xt_lags.T, xt_lags)), XDX_bartlett_matrix(xt_lags, Xt - Xt_hat, 1)), inv(dot(xt_lags.T, xt_lags)))
+            t_stat = (betas_ar[1, 0] - coef) / (var_b_west[1, 1] ** 0.5)
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ar_list[4] += 1
+            # Скорректировано на размер
+            t_stat = (betas_ar[1, 0] - coef) / (var_b_west[1, 1] ** 0.5) + 5 / 128 ** 0.5
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ar_corr_list[4] += 1
+            # Оценка дисперсии по формуле Ньюи-Веста с квадратичным спектральным ядром
+            var_qs_west = dot(dot(inv(dot(xt_lags.T, xt_lags)), XDX_QS_matrix(xt_lags, Xt - Xt_hat, 1)), inv(dot(xt_lags.T, xt_lags)))
+            t_stat = (betas_ar[1, 0] - coef) / (var_qs_west[1, 1] ** 0.5)
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ar_list[5] += 1
+            # Скорректировано на размер
+            t_stat = (betas_ar[1, 0] - coef) / (var_qs_west[1, 1] ** 0.5) + 5 / 128 ** 0.5
+            if abs(t_stat) > 1.9788:
+                h0_rejection_ar_corr_list[5] += 1
+            # --------- Цикл для оценок t-статистики с разделением выборки на группы-------------------------------------------
             for group_num, group in enumerate(groups):
                 # Разделение генеральной выборки на q выборок для оценки MA(1)
                 ma_Xt_arrays = split(Xt_ma, group, axis=0)
@@ -93,7 +179,7 @@ def table_part ():
                     cur_ma_Xt = ma_Xt_arrays[iter_]
                     cur_y_ma = y_ma_arrays[iter_]
                     ma_cur_betas = dot(inv(dot(cur_ma_Xt.T, cur_ma_Xt)), dot(cur_ma_Xt.T, cur_y_ma))
-                    # Очень странно (зачем модуль?)
+                    # Оценка беты
                     ma_beta_estimations.append(ma_cur_betas[1][0])
                     cur_y_ma_hat = dot(cur_ma_Xt, ma_cur_betas)
                     # cur_y_ma_mean = np.array([[np.mean(cur_y_ma)] for _ in range(len(ma_cur_x))])
@@ -112,34 +198,47 @@ def table_part ():
                 # Оценка t-статистики для MA(1)-процесса для групп q
                 group_beta_mean = mean(ma_beta_estimations)
                 group_var_b_estimation = sum(ma_var_b_ests) / (group - 1)
-                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5) + 5 / 128 ** 0.5
+                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5)
                 if abs(cur_t_stat) > 1.9788:
                     h0_rejection_ma_list[group_num] += 1
+                # Скорректировано на размер
+                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5) + 5 / 128 ** 0.5
+                if abs(cur_t_stat) > 1.9788:
+                    h0_rejection_ma_corr_list[group_num] += 1
                 
-                # t_stat_ma.append(abs(cur_t_stat))
-
                 # Оценка t-статистики для AR(1)-процесса для групп q
                 group_beta_mean = mean(ar_beta_estimations)
                 group_var_b_estimation = sum(ar_var_b_ests) / (group - 1)
-                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5) + 4 / (128 * (1 - coef ** 2)) ** 0.5
+                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5)
                 if abs(cur_t_stat) > 1.9788:
                     h0_rejection_ar_list[group_num] += 1
-                # t_stat_ar.append(abs(cur_t_stat))
+                # Скорректировано на размер
+                cur_t_stat = (group ** 0.5) * (group_beta_mean - coef) / (group_var_b_estimation ** 0.5) + 4 / (128 * (1 - coef ** 2)) ** 0.5
+                if abs(cur_t_stat) > 1.9788:
+                    h0_rejection_ar_corr_list[group_num] += 1
         for counter_num, _ in enumerate(h0_rejection_ar_list):
             h0_rejection_ar_list[counter_num] = round(h0_rejection_ar_list[counter_num] / B * 100, 1)
             h0_rejection_ma_list[counter_num] = round(h0_rejection_ma_list[counter_num] / B * 100, 1)
+            h0_rejection_ar_corr_list[counter_num] = round(h0_rejection_ar_corr_list[counter_num] / B * 100, 1)
+            h0_rejection_ma_corr_list[counter_num] = round(h0_rejection_ma_corr_list[counter_num] / B * 100, 1)
         h0_rejection_ar_list.insert(0, 'AR(1) ' + str(coef))
         h0_rejection_ma_list.insert(0, 'MA(1) ' + str(coef))
+        h0_rejection_ar_corr_list.insert(0, 'AR(1)-corrected ' + str(coef))
+        h0_rejection_ma_corr_list.insert(0, 'MA(1)-corrected ' + str(coef))
+
         total_t_ma.append(h0_rejection_ma_list)
         total_t_ar.append(h0_rejection_ar_list)
+        total_t_ma_corr.append(h0_rejection_ma_corr_list)
+        total_t_ar_corr.append(h0_rejection_ar_corr_list)
 
-    # https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D0%B0%D0%BD%D0%B4%D0%B0%D1%80%D1%82%D0%BD%D1%8B%D0%B5_%D0%BE%D1%88%D0%B8%D0%B1%D0%BA%D0%B8_%D0%B2_%D1%84%D0%BE%D1%80%D0%BC%D0%B5_%D0%9D%D1%8C%D1%8E%D0%B8-%D0%A3%D0%B5%D1%81%D1%82%D0%B0
     # Массив из массивов массивов оценок t-статистик для MA- и AR-процессов
     print('100% выполнено')
     total_t.append(total_t_ma)
     total_t.append(total_t_ar)
+    total_t.append(total_t_ma_corr)
+    total_t.append(total_t_ar_corr)
     table = PrettyTable()
-    table.field_names = ['Процесс', 'q(2)', 'q(4)', 'q(8)', 'q(16)']
+    table.field_names = ['Процесс', 'q(2)', 'q(4)', 'q(8)', 'q(16)', 'Newey-West_Bartlett', 'Newey-West_QS']
 
     # Заполнение таблицы результатами оценки
     for proc in total_t:
@@ -151,23 +250,27 @@ def table_part ():
 
 def financial_research():
     # Часть 2
-    '''
+    os.chdir('/home/alex/Programs/Python/Econometrics')
     # Данные представлены недельными ценовыми наблюдениями акций компании ПАО Алроса за период 
     # с 28.11.11 по 26.02.18
-
-    file = open('econometrics2_data.txt', 'r')
-    data = []
-    for line in file:
-        data.append(line[:-1])
-    data = np.array(data)
-
+    data = pd.read_csv('econometrics2_data.txt', sep=' ',dtype='float64')
+    # print(data)
+    # file = open('econometrics2_data.txt', 'r')
+    # data = []
+    # for line in file:
+    #     data.append(line[:-1])
+    # data = array(data)
+    # data = data.reshape(1, len(data))
+    plot_acf(x=data['Алроса'], use_vlines=True, title='ACF', unbiased=True, zero=True)
+    plt.savefig('ACF')
+    plot_pacf(x=data['Алроса'], use_vlines=True, title='PACF', zero=True)
+    plt.savefig('PACF')
     # p_max - оценка максимального количества лагов в модели
-    T = 128
-    p_max = 4 * ((T / 100) ** (1/3))
-    print(round(p_max))
-    print(data)
-    print(var_shift(data, 1))
-    '''
+    # T = 128
+    # p_max = 4 * ((T / 100) ** (1/3))
+    # print(round(p_max))
+    # print(data)
+    # print(var_shift(data, 1))
 
 
 def res_bootstrap(X, betas_hat, eps_hat, t_crit, B):
@@ -340,4 +443,4 @@ def bootstrap_part():
 
 
 if __name__ == "__main__":
-    table_part()
+    financial_research()
