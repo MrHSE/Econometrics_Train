@@ -3,11 +3,13 @@
 Created on Sat Okt 13 12:24:32 2019
 @author: Daniil
 """
-from numpy import dot, array, eye, ones, zeros, hstack, vstack, mean, transpose, corrcoef, diagonal, reshape, exp, full, diagflat, abs, split, shape
+from numpy import dot, array, eye, ones, zeros, hstack, vstack, mean, transpose, corrcoef, diagonal, reshape, exp, full, diagflat, abs, split, shape, var, arange
 from numpy.random import normal, uniform, standard_cauchy, randint, choice
 from numpy.linalg import inv, det
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from math import sin, cos
+import statsmodels.api as sm
+import scipy.stats as stat
+from math import sin, cos, log, e
 from prettytable import PrettyTable
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -89,6 +91,9 @@ def var_shift(var, shift):
 
 def table_part ():
     # Часть 1
+    file.write('Задание 1.\n')
+    file.write('Воспроизвести результаты таблицы 1 из статьи Ibragimov and Muller (2010)\n')
+    file.write('"t-Statistic Base Correlation and Heterogenity Robust Inference", первые 6 столбцов\n')
     T = 128
     coefs_vars = [-0.5, 0.5, 0.9, 0.95]
     groups = [2, 4, 8, 16]
@@ -111,6 +116,7 @@ def table_part ():
         h0_rejection_ma_corr_list = [h0_rej_ma_gr2_corr, h0_rej_ma_gr4_corr, h0_rej_ma_gr8_corr, h0_rej_ma_gr16_corr, h0_rej_ma_b_corr, h0_rej_ma_qs_corr]
         h0_rej_ar_gr2_corr, h0_rej_ar_gr4_corr, h0_rej_ar_gr8_corr, h0_rej_ar_gr16_corr, h0_rej_ar_b_corr, h0_rej_ar_qs_corr = 0, 0, 0, 0, 0, 0
         h0_rejection_ar_corr_list = [h0_rej_ar_gr2_corr, h0_rej_ar_gr4_corr, h0_rej_ar_gr8_corr, h0_rej_ar_gr16_corr, h0_rej_ar_b_corr, h0_rej_ar_qs_corr]
+        # Цикл по количеству бутстрапированных оценок
         for _ in range(B):
             # -----------------Оценка t-статистики c использованием оценки Нью-Веста------------------------------------
             # Генерация MA(1)-процесса по заданной функции
@@ -162,6 +168,7 @@ def table_part ():
             if abs(t_stat) > 1.9788:
                 h0_rejection_ar_corr_list[5] += 1
             # --------- Цикл для оценок t-статистики с разделением выборки на группы-------------------------------------------
+            # Цикл с разделением выборок на подвыборки
             for group_num, group in enumerate(groups):
                 # Разделение генеральной выборки на q выборок для оценки MA(1)
                 ma_Xt_arrays = split(Xt_ma, group, axis=0)
@@ -174,6 +181,7 @@ def table_part ():
                 Xt_arrays = split(Xt, group, axis=0)
                 ar_beta_estimations = []
                 ar_var_b_ests = []
+                # Цикл для оценки коэффициентов и дисперсий в подвыборках
                 for iter_ in range(group):
                     # Итерации при оценке MA(1)
                     cur_ma_Xt = ma_Xt_arrays[iter_]
@@ -244,38 +252,170 @@ def table_part ():
     for proc in total_t:
         for res in proc:
             table.add_row(res)
-    print(table)
-
+    file.write(str(table))
 
 
 def financial_research():
     # Часть 2
     os.chdir('/home/alex/Programs/Python/Econometrics')
-    # Данные представлены недельными ценовыми наблюдениями акций компании ПАО Алроса за период 
-    # с 28.11.11 по 26.02.18
-    data = pd.read_csv('econometrics2_data.txt', sep=' ',dtype='float64')
-    # print(data)
-    # file = open('econometrics2_data.txt', 'r')
-    # data = []
-    # for line in file:
-    #     data.append(line[:-1])
-    # data = array(data)
-    # data = data.reshape(1, len(data))
-    plot_acf(x=data['Алроса'], use_vlines=True, title='ACF', unbiased=True, zero=True)
+    file.write('\n\nЗадание 2.\n')
+    file.write('Взять финансовый временной ряд, подобрать регрессионную модель, обосновать.\n')
+    file.write('Скорректировать на смещение оценки коэффициентов и протестировать гипотезу о равенстве последнего коэффициента нулю.\n')
+    file.write('Сравнить результаты со стандартными методами\n')
+    file.write('Были выбраны данные по Алросе. Цены представлены недельными наблюдениями за период с 28.11.11 по 26.02.18.\n')
+    file.write('Для выбора модели используется построение ACF, PACF и информационный коэффициент Шварца, рассчитываемый как\n')
+    file.write('BIC = k * ln(n) - 2 * l, где k - количество оцениваемых параметров, n - количество наблюдений, а l - оценка функции правдоподобия')
+    print('Загрузка данных...')
+    alrosa_table = pd.read_csv('econometrics2_data.txt', sep=' ',dtype='float64')
+    os.chdir('/home/alex/Programs/ScriptsInWork')
+    # ------------------Генерация переменных-----------------------
+    Y = array(alrosa_table['Алроса'])
+    row_length = len(Y)
+    # Автокорреляционная и частная автокорреляционная функции для зависимой переменной
+    print('Построение ACF и PACF...')
+    plot_acf(x=Y, use_vlines=True, title='ACF', unbiased=True, zero=True)
     plt.savefig('ACF')
-    plot_pacf(x=data['Алроса'], use_vlines=True, title='PACF', zero=True)
+    plot_pacf(x=Y, use_vlines=True, title='PACF', zero=True)
     plt.savefig('PACF')
-    # p_max - оценка максимального количества лагов в модели
-    # T = 128
-    # p_max = 4 * ((T / 100) ** (1/3))
-    # print(round(p_max))
-    # print(data)
-    # print(var_shift(data, 1))
+    # Максимальное количество лагов, которое стоит рассматривать для тестирования
+    p_max = int(4 * (row_length / 100) ** 0.33)
+    Y = Y.reshape(row_length, 1)
+    # Список лаговых массивов xt
+    xt_lags_list = []
+    for lag in range(p_max):
+        xt_lags_list.append(var_shift(Y, lag+1))
+    const = ones(shape=(len(Y), 1))
+    # Список для коэффициентов Шварца
+    BIC_coefs = []
+    # Список для различных матриц независимых переменных
+    Xt_arrays = []
+    # Список для оценок коэффициентов
+    betas_hat_coefs = []
+    # Список для остатков строящихся моделей
+    eps_hat_array = []
+    # Переменная тренда
+    trend = arange(row_length).reshape(row_length, 1)
+    # ---------------------Поиск оптимальной модели-----------------------
+    # Цикл для генерации внутри моделей с разным числом лагов (p_max считается как 4*(T/3)^0.33)
+    print('Поиск оптимальной модели...')
+    for vars_amount in range(p_max):
+        # Цикл для модели с трендом и без тренда
+        for iter_ in range(2):
+            # Цикл для объединения переменных x с различным лагом в матрицу
+            Xt = xt_lags_list[0]
+            Xt = hstack((const, Xt))
+            if iter_ == 1:
+                # Добавление к каждому набору переменных тренда, если идёт второй цикл по текщей матрице независимых переменных
+                Xt = hstack((trend, Xt))
+            # Цикл для набора лаговых переменных в матрицу регрессоров
+            for cva in range(1, p_max - vars_amount):
+                Xt = hstack((Xt, xt_lags_list[cva]))
+            # Добавление матрицы регрессоров в список всех используемых в построении моделей матриц
+            Xt_arrays.append(Xt)
+            # Оценка коэффициентов
+            betas_hat = dot(inv(dot(transpose(Xt), Xt)), dot(transpose(Xt), Y))
+            # Добавление получившихся коэффициентов в список
+            betas_hat_coefs.append(betas_hat)
+            # Оценка зависимой переменной
+            Y_hat = dot(Xt, betas_hat)
+            # Оценка ошибок
+            eps_hat = Y - Y_hat
+            # Добавление остатков в список остатков
+            eps_hat_array.append(eps_hat)
+            
+            # Посчитаем логарифм правдоподобия
+            resid_mean = mean(eps_hat)
+            resid_var = var(eps_hat)
+            likelyhood = 0
+            pi = 3.1416
+            for el in eps_hat:
+                likelyhood += log((1 / (2 * pi * resid_var) ** 0.5) * exp(-1 / (2 * resid_var) * (el[0] - resid_mean) ** 2), e)
+            # Коэффициент Шварца
+            BIC = len(betas_hat)*log(row_length, e) - 2*likelyhood
+            BIC_coefs.append(BIC)
+    # Судя по информационному коэффициенту Шварца, самой лучшей моделью оказалась модель с константой, 
+    # трендом и одной лаговой переменной
+    # Ищем в списке самый малый коэффициент Шварца
+    best_model_num = BIC_coefs.index(min(BIC_coefs)) # Номер лучшей модели из оценённых
+    # Вытащим из списка матрицу регрессоров, остатков и коэффициентов из модели с наименьшим BIC
+    betas_hat = betas_hat_coefs[best_model_num]
+    Xt = Xt_arrays[best_model_num]
+    eps_hat = eps_hat_array[best_model_num]
+
+    # ------Протестируем гипотезу о равенстве нулю коэффициента при последней переменной-----
+    print('Проверка коэффициента на значимость')
+    # Оценка дисперсии
+    betas_var = inv(dot(transpose(Xt), Xt)) * dot(transpose(eps_hat), eps_hat) / (len(eps_hat) - 3)
+    t_stat = (betas_hat[2, 0]) / (betas_var[2, 2] ** 0.5)
+    if abs(t_stat) > 1.9673:
+        result_ = 'гипотеза отвергается'
+    else:
+        result_ = 'гипотеза не отвергается'
+    file.write('Таким образом, результаты стандартной оценки коэффициентов и дисперсии дают следующие результаты\n')
+    file.write('Коэффициент при тренде, константе и лаговой переменной соответственно равно: ' + str(betas_hat) + '\n')
+    file.write('Ковариационная матрица коэффициентов равна:' + str(betas_var) + '\n')
+    file.write('В результате проведения теста на равенство лаговой переменной нулю' + str(result_) + 'а t-статистика равна' + str(t_stat) + '\n')
+    # Скорректируем оценку коэффициентов
+    betas_hat_coefs[best_model_num][2, 0] = -(4 * betas_hat_coefs[best_model_num][2, 0] + 2)
+    # ---------------Recoloring (сгенерируем остатки)------------------------------
+    ut = eps_hat_array[best_model_num]
+    ut_lags_list = []
+    # Сгенерируем лаговые остатки
+    for lag in range(p_max):
+        ut_lags_list.append(var_shift(ut, lag+1))
+    # Списки для матриц регрессоров, оценок коэффициентов, остатков и коэффициентов Шварца
+    ut_lags_array = []
+    ut_betas_list = []
+    ut_eps_array = []
+    ut_BIC_coefs = []
+    print('Coloring')
+    for vars_amount in range(p_max):
+        # Цикл для объединения переменных x с различным лагом в матрицу
+        ut_matrix = ut_lags_list[0]
+        for cva in range(1, p_max - vars_amount):
+            ut_matrix = hstack((ut_matrix, ut_lags_list[cva]))
+        ut_lags_array.append(ut_matrix)
+        # Оценка коэффициентов
+        betas_hat = dot(inv(dot(transpose(ut_matrix), ut_matrix)), dot(transpose(ut_matrix), ut))
+        ut_betas_list.append(betas_hat)
+        # Оценка зависимой переменной
+        ut_hat = dot(ut_matrix, betas_hat)
+        # Найдём оценку ошибок
+        eps_hat = ut - ut_hat
+        ut_eps_array.append(eps_hat)
+        # Посчитаем логарифм правдоподобия
+        resid_mean = mean(eps_hat)
+        resid_var = var(eps_hat)
+        likelyhood = 0
+        pi = 3.1416
+        for el in eps_hat:
+            likelyhood += log((1 / (2 * pi * resid_var) ** 0.5) * exp(-1 / (2 * resid_var) * (el[0] - resid_mean) ** 2), e)
+        BIC = len(betas_hat)*log(row_length, e) - 2*likelyhood
+        ut_BIC_coefs.append(BIC)
+    
+    # Вычисление оценки ut*
+    best_ut_model_num = ut_BIC_coefs.index(min(ut_BIC_coefs))
+    best_ut_betas = ut_betas_list[best_ut_model_num]
+    best_ut_matrix = ut_lags_array[best_ut_model_num]
+    
+    ut_new = dot(best_ut_matrix, best_ut_betas)
+    # Количество симуляций для бутстраповского теста
+    B = 399
+    # Остатки для residual bootstrap
+    new_ut_hat = (len(Xt_arrays[best_model_num]) / (len(Xt_arrays[best_model_num]) - shape(Xt_arrays[best_model_num])[1])) ** 0.5 * ut_new
+    # Бутстрап для теста значимости лаговой переменной
+    print('Бутстрап...')
+    boot_res_results = res_bootstrap(Xt_arrays[best_model_num], betas_hat_coefs[best_model_num], 2, 0, new_ut_hat, 1.9673, B) / B
+    boot_par_results = par_bootstrap(Xt_arrays[best_model_num], betas_hat_coefs[best_model_num], 2, 0, ut_new, 1.9673, B) / B
+    boot_wild_results = wild_bootstrap(Xt_arrays[best_model_num], betas_hat_coefs[best_model_num], 2, 0, ut_new, 1.9673, B) / B
+    boot_pair_results = pair_bootstrap(Xt_arrays[best_model_num], Y, betas_hat_coefs[best_model_num], 2, 0, 1.9673, B) / B
+    # Частота отвержения гипотезы о равенстве
+    file.write('Доля отвержения нулевой гипотезы в бутстрапах составляет:\n' + str(boot_res_results) + ', ' + str(boot_par_results) + ', ' + str(boot_wild_results) + ', ' + str(boot_pair_results))
 
 
-def res_bootstrap(X, betas_hat, eps_hat, t_crit, B):
+def res_bootstrap(X, betas_hat, testing_var_num, H0_coef, eps_hat, t_crit, B):
     # Идея: ресэмлировать остатки с возвратом для генерации бутстрапированных моделей
-    print('Расчёт бутстрапа по остаткам для', len(X), 'наблюдений')
+    file.write('Расчёт бутстрапа по остаткам для' + str(len(X)) + 'наблюдений...\n')
     h0_reject_freq = 0
     for _ in range(B):
         # Случайный отбор ошибки из уже сгенерированных
@@ -286,15 +426,15 @@ def res_bootstrap(X, betas_hat, eps_hat, t_crit, B):
         Y_hat = dot(X, bootstrap_betas)
 
         var_betas = inv(dot(transpose(X), X)) * dot(transpose(Y_hat - Y), Y_hat - Y) / (len(Y) - 2)
-        t_stat = abs((bootstrap_betas[1, 0] - betas_hat[1, 0]) / (var_betas[1, 1] ** 0.5))
+        t_stat = abs((bootstrap_betas[testing_var_num, 0] - H0_coef) / (var_betas[1, 1] ** 0.5))
         if t_stat > t_crit:
             h0_reject_freq += 1
     return h0_reject_freq
 
 
-def par_bootstrap(X, betas_hat, eps_hat, t_crit, B):
+def par_bootstrap(X, betas_hat, testing_var_num, H0_coef, eps_hat, t_crit, B):
     # Идея: генерировать ошибки по распределению остатков
-    print('Расчёт параметрического бутстрапа для', len(X), 'наблюдений')
+    file.write('Расчёт параметрического бутстрапа для' + str(len(X)) + 'наблюдений...\n')
     h0_reject_freq = 0
     for _ in range(B):
         # Ошибки распределены нормально (т.к таков DGP), оценим параметры распределения
@@ -308,16 +448,16 @@ def par_bootstrap(X, betas_hat, eps_hat, t_crit, B):
         Y_hat = dot(X, bootstrap_betas)
 
         var_betas = inv(dot(transpose(X), X)) * dot(transpose(Y_hat - Y), Y_hat - Y) / (len(X) - 2)
-        t_stat = abs((bootstrap_betas[1, 0] - betas_hat[1, 0]) / (var_betas[1, 1] ** 0.5))
+        t_stat = abs((bootstrap_betas[testing_var_num, 0] - H0_coef) / (var_betas[1, 1] ** 0.5))
         if t_stat > t_crit:
             h0_reject_freq += 1
     return h0_reject_freq
 
 
-def wild_bootstrap(X, betas_hat, eps, t_crit, B):
+def wild_bootstrap(X, betas_hat, testing_var_num, H0_coef, eps, t_crit, B):
     # Wild bootstrap нужен, чтобы контролировать гетероскедастичность в выборке
     # Идея: генерация ошибок на основе оценки дисперсии Уайта для контроля гетероскедастичности
-    print('Расчёт wild бутстрапа для', len(X), 'наблюдений')
+    file.write('Расчёт wild бутстрапа для' + str(len(X)) + 'наблюдений...\n')
     # Оценка (1-h)eps
     h = diagonal(dot(dot(X, inv(dot(transpose(X), X))), transpose(X)))
     for row in range(len(X)):
@@ -334,16 +474,16 @@ def wild_bootstrap(X, betas_hat, eps, t_crit, B):
         Y_hat = dot(X, bootstrap_betas)
 
         var_betas = inv(dot(transpose(X), X)) * dot((Y_hat - Y).T, Y_hat - Y) / (len(X) - 2)
-        t_stat = abs((bootstrap_betas[1, 0] - betas_hat[1, 0]) / (var_betas[1, 1] ** 0.5))
+        t_stat = abs((bootstrap_betas[testing_var_num, 0] - H0_coef) / (var_betas[1, 1] ** 0.5))
         if t_stat > t_crit:
             h0_reject_freq += 1
     return h0_reject_freq
 
 
-def pair_bootstrap(X, Y, betas_hat, t_crit, B):
+def pair_bootstrap(X, Y, betas_hat, testing_var_num, H0_coef, t_crit, B):
     # Вроде работает даже в случае гетероскедастичности ошибок
     # И для временных рядов
-    print('Расчёт парного бутстрапа для', len(X), 'наблюдений')
+    file.write('Расчёт парного бутстрапа для' + str(len(X)) + 'наблюдений...\n')
     h0_reject_freq = 0
     for _ in range(B):
         observations = [i for i in range(len(X))]
@@ -358,7 +498,7 @@ def pair_bootstrap(X, Y, betas_hat, t_crit, B):
         Y_hat = dot(X_new, bootstrap_betas)
 
         var_betas = inv(dot(transpose(X_new), X_new)) * dot(transpose(Y_hat - Y_new), Y_hat - Y_new) / (len(X) - 2)
-        t_stat = abs((bootstrap_betas[1, 0] - betas_hat[1, 0]) / (var_betas[1, 1] ** 0.5))
+        t_stat = abs((bootstrap_betas[testing_var_num, 0] - H0_coef) / (var_betas[1, 1] ** 0.5))
         if t_stat > t_crit:
             h0_reject_freq += 1
     return h0_reject_freq
@@ -393,6 +533,7 @@ def student_res(yt_mean, yt_sigma, ut_sigma, b1, b2, length, t_crit, B):
 
 def bootstrap_part():
     # Часть 3
+    file.write('\n\nЗадание 3. Воспроизведём эксперимент с использованием разных бустрапов\n')
     # Количество наблюдений в различных генерациях
     # Список количества наблюдений для различных генераций
     var_lengths = [10, 14, 20, 28, 40, 56, 80, 113, 160, 226, 320, 452, 640, 905, 1280]
@@ -403,8 +544,10 @@ def bootstrap_part():
     B = int(input("Напишите количество бутстраповских повторов: "))
     # Сгенерируем модель вида yt = b1 + b2*y_t-1 + ut;
     b1, b2 = 3, 5
+    print('Бутстраповские симуляции. Задание 3.')
     for length_num, length in enumerate(var_lengths):
-        print('Генерация модели с ' + str(length) + ' наблюдениями')
+        print('Осталось провести бутстраповские оценки для', len(var_lengths) - length_num, 'моделей')
+        file.write('Генерация модели с ' + str(length) + ' наблюдениями\n')
         yt_mean = 0
         yt_sigma = 3
         yt = normal(yt_mean, yt_sigma, size=(length, 1))
@@ -428,10 +571,10 @@ def bootstrap_part():
         new_eps_hat = (len(X) / (len(X) - shape(X)[1])) ** 0.5 * eps_hat
 
         # Расчёт бутстрапированных оценок
-        boot_res_results = res_bootstrap(X, betas_hat, new_eps_hat, t_crits[length_num], B) / B
-        boot_par_results = par_bootstrap(X, betas_hat, eps_hat, t_crits[length_num], B) / B
-        boot_wild_results = wild_bootstrap(X, betas_hat, eps_hat, t_crits[length_num], B) / B
-        boot_pair_results = pair_bootstrap(X, Y, betas_hat, t_crits[length_num], B) / B
+        boot_res_results = res_bootstrap(X, betas_hat, 1, betas_hat[1, 0], new_eps_hat, t_crits[length_num], B) / B
+        boot_par_results = par_bootstrap(X, betas_hat, 1, betas_hat[1, 0], eps_hat, t_crits[length_num], B) / B
+        boot_wild_results = wild_bootstrap(X, betas_hat, 1, betas_hat[1, 0], eps_hat, t_crits[length_num], B) / B
+        boot_pair_results = pair_bootstrap(X, Y, betas_hat, 1, betas_hat[1, 0], t_crits[length_num], B) / B
         t_student = student_res(yt_mean, yt_sigma, ut_sigma, b1, b2, length, t_crits[length_num], B) / B
         results.append([t_student, boot_res_results, boot_par_results, boot_wild_results, boot_pair_results])
 
@@ -443,4 +586,8 @@ def bootstrap_part():
 
 
 if __name__ == "__main__":
+    file = open('Econometrics_Homework2_Results.txt', 'w')
+    table_part()
     financial_research()
+    bootstrap_part()
+    file.close()
